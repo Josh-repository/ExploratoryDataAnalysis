@@ -1,0 +1,692 @@
+---
+title: "R_Final_Project"
+author: "Joshua"
+date: "16/11/2020"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+Set the working directory and Intsalled necessary packages,
+libraries
+```{r}
+setwd("D:/UCD/Data Programming With R/Autumn/Final Project")
+library(tidyverse)#to use ggplot and dplyr library in data
+library(ggplot2)#used for plotting differnt plots in my data
+library(caret)
+library(psych)
+install.packages("pastecs",repos = "http://cran.us.r-project.org")
+install.packages("GGally",repos = "http://cran.us.r-project.org")
+install.packages("e1071",repos = "http://cran.us.r-project.org")
+
+```
+
+
+Data set is taken from kaggle:
+https://www.kaggle.com/uciml/default-of-credit-card-clients-dataset
+
+
+#Problem Statement:
+
+The objective of the project is to predict whether the customer defaults 
+or not using logistic regression model and check the accuracy of the 
+model after performing data cleaning and exploratory analysis on the 
+data.The given dataset contains information on default payments, 
+credit data, demographic factors, payment history, and bill statements 
+of credit card clients in Taiwan from April 2005 to September 2005. 
+
+
+```{r}
+#lodaing the data set into data frame
+df<-read.csv("Taiwan-Customer defaults.csv")
+#To check fisrt 10 rows of the data set
+head(df,n=10)
+#To check the number of rows and columns
+str(df)
+#Removing the first column Id from the dataset
+df = df[-1,-1]
+
+colnames(df) =
+  c("LIMIT_BALANCE","GENDER", "EDUCATION","MARITAL_STATUS", 
+    "AGE","REPAY_SEP","REPAY_AUG","REPAY_JUL","REPAY_JUN",
+    "REPAY_MAY","REPAY_APR","BILLAMT_SEP","BILLAMT_AUG",
+    "BILLAMT_JUL","BILLAMT_JUN","BILLAMT_MAY",
+   "BILLAMT_APR","REPAYAMT_SEP","REPAYAMT_AUG",
+  "REPAYAMT_JUL",
+  "REPAYAMT_JUN","REPAYAMT_MAY",
+   "REPAYAMT_APR","DEFAULT")
+#Checking the last column after the column name updated
+head(df,n=3)
+```
+
+#Converted all the catagoerical data Sex,Education and Marriage                   to factors and assigned corresponding levels with suitable names
+
+```{r}
+#converting it to factor variable
+df$GENDER=as.factor(df$GENDER)
+#replacing the factor levels from 1 and 2 to Male and Female
+levels(df$GENDER)=c("MALE","FEMALE")
+
+df$EDUCATION = ifelse(df$EDUCATION=="1","GRADUATE SCHOOL",ifelse(df$EDUCATION=="2","UNIVERSITY",
+                                                                 ifelse(df$EDUCATION=="3","HIGHSCHOOL","OTHERS")))
+
+df$MARITAL_STATUS = ifelse(df$MARITAL_STATUS=="1","MARRIED",
+                ifelse(df$MARITAL_STATUS=="2","SINGLE","OTHERS"))
+head(df,n=3)
+
+```
+
+#Converted the Pay_0 to Pay_6 columns of the data to factor variables           and assigned corresponding levels with suitable names
+
+```{r}
+ df$REPAY_APR = ifelse(df$REPAY_APR=="-2","NO PAYMENT BALANCE", ifelse(df$REPAY_APR=="-1","DULY PAID", ifelse(df$REPAY_APR=="0",                                    "PARTIALLY PAID",df$REPAY_APR)))
+
+df$REPAY_MAY = ifelse(df$REPAY_MAY=="-2","NO PAYMENT BALANCE", ifelse(df$REPAY_MAY=="-1","DULY PAID", ifelse(df$REPAY_MAY=="0",
+"PARTIALLY PAID",df$REPAY_MAY)))
+
+df$REPAY_JUN = ifelse(df$REPAY_JUN=="-2","NO PAYMENT BALANCE", ifelse(df$REPAY_JUN=="-1","DULY PAID", ifelse(df$REPAY_JUN=="0",
+"PARTIALLY PAID",df$REPAY_JUN)))
+df$REPAY_JUL = ifelse(df$REPAY_JUL=="-2","NO PAYMENT BALANCE", ifelse(df$REPAY_JUL=="-1","DULY PAID",ifelse(df$REPAY_JUL=="0",
+"PARTIALLY PAID",df$REPAY_JUL)))
+df$REPAY_AUG = ifelse(df$REPAY_AUG=="-2","NO PAYMENT BALANCE", ifelse(df$REPAY_AUG=="-1","DULY PAID", ifelse(df$REPAY_AUG=="0",
+"PARTIALLY PAID",df$REPAY_AUG)))
+
+df$REPAY_SEP = ifelse(df$REPAY_SEP=="-2","NO PAYMENT BALANCE", ifelse(df$REPAY_SEP=="-1","DULY PAID", ifelse(df$REPAY_SEP=="0",
+"PARTIALLY PAID",df$REPAY_SEP)))
+head(df,n=3)
+```
+
+#Converted variables to appropriate datatypes -factor and numerical
+
+```{r}
+numericCols = c("LIMIT_BALANCE","AGE","BILLAMT_SEP","BILLAMT_AUG",
+                "BILLAMT_JUL","BILLAMT_JUN","BILLAMT_MAY",
+                "BILLAMT_APR", "REPAYAMT_SEP","REPAYAMT_AUG","REPAYAMT_JUL","REPAYAMT_JUN",
+                "REPAYAMT_MAY",
+                "REPAYAMT_APR") 
+for(col in colnames(df))
+  {
+ if(col %in% numericCols)
+ { df[[col]] = as.numeric(df[[col]]) }
+else{ df[[col]] = as.factor(df[[col]]) } 
+}
+head(df,n=3)
+```
+
+#Exploratory data analysis
+-The data set has 29999 observations with 25 dimensions of 
+which 11 are discrete and 14 are continuous variables in which we
+removed the ID column which doesnt provide any significance to
+the model building.
+-There are no missing values in the dataset 
+- Out of 29999 observations, 6636 i.e. 22% are defaulters 
+and remaining 23364 (78%) are non-defaulters
+
+```{r}
+str(df)
+dim(df)
+head(df,n=2)
+tail(df,n=2)
+colSums(is.na(df))# No Missing values
+```
+
+#Summary table of numeric variables
+Created a function which calculates the summary statistics of
+the numeric variables in the dataset which return the corresponding
+Min,First_Quadrant, Median,Mean,Third_Quadrant, Max,std_deviation,
+variance of the numeric variables.
+
+Created a class object summary of class type sum_stat to store the
+summary statistics of the numerical variables.
+
+
+```{r}
+library(pastecs)
+#created numeric cols of the data frame
+numericCols = c("LIMIT_BALANCE","AGE","BILLAMT_SEP",
+                "BILLAMT_AUG",
+                "BILLAMT_JUL","BILLAMT_JUN","BILLAMT_MAY",
+                "BILLAMT_APR", "REPAYAMT_SEP","REPAYAMT_AUG","REPAYAMT_JUL","REPAYAMT_JUN",
+                "REPAYAMT_MAY",
+                "REPAYAMT_APR")
+#created a empty data frame to store the values of the output
+sum2 = data.frame()
+p = list()
+summ1<-function(y){
+for(x in y)
+  { st=stat.desc(df[[x]], basic=F) 
+  s=summary(df[[x]])
+  
+  summary = list()
+  # summary of class sum_stat using s3 class
+  summary = class("sum_stat") 
+  
+  Feature = x
+  #rounding the values to three disgits
+  Min = round(s[["Min."]],3) 
+  First_Quadrant=round(s[["1st Qu."]],3) 
+  Median = round(s[["Median"]],3) 
+  Mean = round(s[["Mean"]],3) 
+  Third_Quadrant=round(s[["3rd Qu."]]) 
+  Max=round(s[["Max."]],3) 
+  std_deviation=round(st[["std.dev"]],3) 
+  variance=round(st[["var"]],3)
+  #plots histogram of the numericalcols accordingly
+  p=hist(df[[x]],main=x,col='grey')
+  sum2=rbind(sum2,
+             data.frame(Feature,Min,First_Quadrant, Median,Mean,
+                Third_Quadrant, Max,std_deviation,variance))
+  
+}
+  #passing the value to class list
+  summary$stat = c(summary, sum2)
+  #returning the summary statistic values and plots stored
+  return(summary) 
+  return(p)
+  
+}
+
+summ1(numericCols)#passing numeric cols of the data as an argument
+
+```
+
+
+
+
+
+#Summary table of factor variables which gives the counts                        at each combination of factor levels.
+```{r}
+#To filter Factor variables individually
+factors = Filter(is.factor,df)
+
+for(x in colnames(factors)) 
+{ 
+  print((data.frame(x,summary(df[[x]]))))
+}
+
+
+```
+
+# Bar plot of factor variables EDUCATION,MARITAL_STATUS,GENDER                     and their correponding count at each levels.
+```{r}
+
+ggplot(df, aes(x=EDUCATION))+
+  geom_bar(stat="Count", width=0.7, fill="steelblue")+
+  theme_minimal()
+ggplot(df, aes(x=MARITAL_STATUS))+
+  geom_bar(stat="Count", width=0.7, fill="#FF6666")+
+  theme_minimal()
+ggplot(df, aes(x=GENDER))+
+  geom_bar(stat="Count", width=0.7,fill="grey")+
+  theme_minimal()
+
+```
+
+
+# Histogram of numeric variables LIMIT_BALANCE,AGE,BILLAMT_APR,         BILLAMT_MAY,BILLAMT_JUN,BILLAMT_JUL,BILLAMT_AUG,BILLAMT_SEP
+used ggpubr package and used ggarrange function to plot all the
+graphs one after the other by providing number of rows and 
+number of columns
+```{r}
+
+library(ggpubr)#to use ggarrange
+p1<-ggplot(df, aes(x=LIMIT_BALANCE)) +
+    geom_histogram(colour="black",bins=30) 
+p2<-ggplot(df, aes(x=AGE)) +
+    geom_histogram(colour="black",bins=30) 
+p3<-ggplot(df, aes(x=BILLAMT_APR)) +
+    geom_histogram(colour="black",bins=5)
+p4<-ggplot(df, aes(x=BILLAMT_MAY)) +
+    geom_histogram(colour="black",bins=10)
+p5<-ggplot(df, aes(x=BILLAMT_JUN)) +
+    geom_histogram(colour="black",bins=10)
+p6<-ggplot(df, aes(x=BILLAMT_JUL)) +
+    geom_histogram(colour="black",bins=10)
+p7<-ggplot(df, aes(x=BILLAMT_AUG)) +
+    geom_histogram(colour="black",bins=10)
+p8<-ggplot(df, aes(x=BILLAMT_SEP)) +
+    geom_histogram(colour="black",bins=10)
+ggarrange(p1, p2, p3,p4,p5,p6,
+          labels = c("A", "B", "C","D","E","F"),
+          ncol = 2, nrow = 4)
+
+```
+
+
+#Scatter Plot between Bill Amount and Repayment Amount and correspodning          linear regression model is being implemented to check the relationship.            to check how the data is spread across the linear fitted line
+```{r}
+library(ggplot2)
+ggplot (df, aes(x=BILLAMT_APR, y=REPAYAMT_APR), ) + 
+  geom_point(shape=18, color="blue")+ xlab("Bill Amount") +
+  ylab("Repayment")+ 
+  labs(title="April")+ geom_smooth(method=lm, se=FALSE, color="darkred")
+
+ggplot(df, aes(x=BILLAMT_MAY, y=REPAYAMT_MAY), ) + geom_point(shape=17, color="blue")+ xlab("Bill Amount") + ylab("Repayment")+ 
+  labs(title="May")+ geom_smooth(method=lm, se=FALSE, color="darkred")
+
+ggplot(df, aes(x=BILLAMT_JUN, y=REPAYAMT_JUN), ) + geom_point(shape=19, color="blue")+ xlab("Bill Amount") + ylab("Repayment")+ 
+  labs(title="June")+ geom_smooth(method=lm, se=FALSE, color="darkred")
+
+ggplot(df, aes(x=BILLAMT_JUL, y=REPAYAMT_JUL), ) + geom_point(shape=18, color="blue")+ xlab("Bill Amount")+ ylab("Repayment")+ labs(title="July")+ geom_smooth(method=lm, se=FALSE, color="darkred")
+
+ggplot(df, aes(x=BILLAMT_AUG, y=REPAYAMT_AUG), ) + geom_point(shape=17, color="blue")+ xlab("Bill Amount") + ylab("Repayment")+ labs(title="August")+ geom_smooth(method=lm, se=FALSE, color="darkred")
+
+ggplot(df, aes(x=BILLAMT_SEP, y=REPAYAMT_SEP), ) + geom_point(shape=19, color="blue")+ xlab("Bill Amount") + ylab("Repayment")+ labs(title="September")+ geom_smooth(method=lm, se=FALSE, color="darkred")
+
+```
+
+
+# Chi Square Test – Default Vs. first three categorical variables
+Checked the significance and probalabilties of first three 
+catagoerical variables GENDER ,Education,Maritial status with 
+Default numerical variable
+```{r}
+factors1<-factors[,1:3,]
+for(x in colnames(factors1)) 
+{ print(paste("---- ",x," ---------")) 
+  tbl = table(df$DEFAULT, df[[x]]) 
+  print(chisq.test(tbl)) 
+  }
+```
+
+# Correlation between numeric variables:
+Checked the correlation of the numeric variables and found strong
+correlation for the BillAMT_APR to BILLAMT_SEP.
+
+#Library GGally:
+The R package 'ggplot2' is a plotting system used for 
+visualisation of the data.
+'GGally' extends 'ggplot2' by adding several functions to reduce 
+the complexity of combining geometric objects with transformed data
+
+#Ggcorr 
+- used to Plot A Correlation Matrix With Ggplot2
+
+#Usage:
+ggcorr(
+  data,
+  method = c("pairwise", "pearson"),
+  cor_matrix = NULL,
+  nbreaks = NULL,
+  digits = 2,
+  name = "",
+  low = "#3B9AB2",
+  mid = "#EEEEEE",
+  high = "#F21A00",
+  midpoint = 0,
+  palette = NULL,
+  geom = "tile",
+  min_size = 2,
+  max_size = 6,
+  label = FALSE,
+  label_alpha = FALSE,
+  label_color = "black",
+  label_round = 1,
+  label_size = 4,
+  limits = c(-1, 1),
+  drop = is.null(limits) || identical(limits, FALSE),
+  layout.exp = 0,
+  legend.position = "right",
+  legend.size = 9,
+  ...
+)
+
+#Example:
+ggcorr(df, hjust =.9, size = 4, low = "black", mid = "steelblue4", 
+       high = "red", layout.exp = 2,geom = "circle")
+
+#Arguments:
+df-a data frame or matrix containing numeric (continuous) data.
+
+hjust-controls horizontal justification for value of 0.9 its right
+justified
+
+low-the lower color of the gradient for continuous scaling of 
+the correlation coefficients.black color for -1.0 correlation 
+value
+mid-the midpoint color of the gradient for continuous scaling of 
+the correlation coefficients.steelblue color for 0 correlation.
+
+high-the upper color of the gradient for continuous scaling of the 
+correlation coefficients.Red for high correlation value of 1.0
+layout.
+exp-a multiplier to expand the horizontal axis to the left if 
+variable names get clipped
+geom-the geom object to use circles to represent the data in 
+the form of circles.
+
+#Results:
+Good correlation plot of of my numerical data representing which
+variables are with high, low and mid correlation values with their 
+corresponding colors.
+The added advantage is that function automatically
+it ignores data in column(s) 'GENDER', 'EDUCATION', 
+'MARITAL_STATUS', 'REPAY_SEP', 'REPAY_AUG', 'REPAY_JUL', 
+'REPAY_JUN', 'REPAY_MAY', 'REPAY_APR', 'DEFAULT' which are not 
+numeric 
+
+
+```{r}
+
+library("GGally")
+ggcorr(df, hjust =.9, size = 4, low = "black", mid = "steelblue4", 
+       high = "red", layout.exp = 2,geom = "circle")
+```
+
+#boxplot of numeric variables
+A boxplot is a standardized way of displaying the distribution 
+of data based on a five number summary 
+(“minimum”, first quartile (Q1), median, third quartile (Q3),
+and “maximum”). It can tell you about your outliers and what 
+their values are. It can also tell you if your data is symmetrical,
+how tightly your data is grouped, and if and how your data is skewed.
+
+From belwo we could see that for every varibale there are outliers
+which may lead building a strong model for the given dataset.
+We need to treat the outliers for better accuracy of the model.
+```{r}
+
+ggplot(df, aes(x=LIMIT_BALANCE)) +
+    geom_boxplot(fill='yellow',colour="black",
+                 outlier.color = "Red")
+ggplot(df, aes(x=AGE)) +
+    geom_boxplot(fill='lightblue',colour="darkred",
+                 outlier.color = "Red")
+ggplot(df, aes(x=BILLAMT_APR)) +
+    geom_boxplot(fill='lightgreen',colour="darkred",
+                 outlier.color = "Red")
+ggplot(df, aes(x=BILLAMT_MAY)) +
+    geom_boxplot(fill='lightgreen',colour="darkred",
+                 outlier.color = "Red")
+ggplot(df, aes(x=BILLAMT_JUN)) +
+    geom_boxplot(fill='lightgreen',colour="darkred",
+                 outlier.color = "Red")
+ggplot(df, aes(x=BILLAMT_JUL)) +
+    geom_boxplot(fill='lightgreen',colour="darkred",
+                 outlier.color = "Red")
+ggplot(df, aes(x=BILLAMT_AUG)) +
+    geom_boxplot(fill='lightgreen',colour="darkred",
+                 outlier.color = "Red")
+ggplot(df, aes(x=BILLAMT_SEP)) +
+    geom_boxplot(fill='lightgreen',colour="darkred",
+                 outlier.color = "Red")
+
+```
+
+#Outlier Treatment of numeric variables
+-From the first boxplot we could see that there are outliers in 
+all variables and the outliers are fairly outside the 1%-99% range.
+And the corressponding distribution is the evident that 
+
+The outliers are treated by removing values that are greater 
+than 99 percentile and lesser than 1 percentile of the total 
+observations and we could see that now the distributions are improved 
+and kind of normal distribution
+
+```{r}
+#Outliers Treatment
+#below displays the boxplot of the numeric variables                            before standardising
+p.range <- NA 
+for (i in numericCols)
+  { Statistic <-
+    data.frame( 
+    "Column" = i, 
+  "Min Value" = min(df[[i]], na.rm = TRUE), 
+"1st Percentile" = quantile(df[[i]], probs = c(0.01), na.rm = TRUE),
+ "Max Value" = max(df[[i]], na.rm = TRUE), 
+"99th Percentile" = quantile(df[[i]], probs = c(0.99),na.rm = TRUE)) 
+  p.range <- rbind(p.range, Statistic) } 
+p.range <- data.table::data.table(p.range) 
+
+boxplot(df , geom_boxplot_args = list("outlier.color" = "red",
+color="black", fill="steelblue4")
+,title = "Box Plot for Variables Vs Default",ncol = 2, nrow=2,by = "DEFAULT",las=2)
+
+for(numcol in numericCols)
+  { 
+  p= ggplot(df, aes(x=df[[numcol]], color=DEFAULT, fill=DEFAULT)) + geom_density(alpha=0.5)+ labs(title=paste("Actual Distribution"),
+x=numcol, y = "Density")
+ print(p)
+}
+
+#used Squish function to maintain the outliers between the range                    0.01 to 0.99 percentiles the values above and below                           that are removed from the observations
+library(dplyr)#used to transumute all the variables
+library(magrittr)
+library(scales)#used to standardise the data
+#moved to a new data frame after the vvariables are s
+
+df2 <- df[,numericCols] %>%
+  transmute_all(funs(squish(., quantile(.,c(0.01,0.99), na.rm = TRUE))))
+df2$DEFAULT = df$DEFAULT 
+df2$GENDER = df$GENDER 
+df2$EDUCATION = df$EDUCATION 
+df2$MARITAL_STATUS = df$MARITAL_STATUS 
+df2$REPAY_SEP = df$REPAY_SEP 
+df2$REPAY_AUG = df$REPAY_AUG 
+df2$REPAY_JUL = df$REPAY_JUL 
+df2$REPAY_JUN = df$REPAY_JUN 
+df2$REPAY_MAY = df$REPAY_MAY 
+df2$REPAY_APR = df$REPAY_APR
+boxplot(df2 ,main = "Box Plot for Variables Vs Default",ncol = 2, 
+        nrow=2,by = "DEFAULt",las=2,col="Red")
+
+p.range2 <- NA 
+for (i in numericCols)
+  { 
+  Statistic <- data.frame( "Column" = i,
+    "Min Value" = min(df2[[i]], na.rm = TRUE), 
+    "1st Percentile" = quantile(df2[[i]], probs = c(0.01), na.rm = TRUE), 
+    "Max Value" = max(df2[[i]], na.rm = TRUE), 
+    "99th Percentile" = quantile(df2[[i]], probs = c(0.99),na.rm = TRUE))
+  p.range2 <- rbind(p.range2, Statistic) }
+
+p.range2 <- data.table::data.table(p.range2)
+
+#printed the density plot dstributios after the outliers removed
+for(numcol in numericCols)
+{p= ggplot(df2, aes(x=df2[[numcol]], color=DEFAULT, fill=DEFAULT)) + geom_density(alpha=0.5)+ labs(title=paste("After flooring and Capping"),   x=numcol, y = "Density") 
+print(p)
+}
+
+
+```
+
+Subtracted 1 from each level of factor variables in the data set
+and created dummy variables for all the factor variables.
+Used scale function to standardise the numeric data variables in the
+data set.Scale is generic function whose default method centers 
+and/or scales the columns of a numeric matrix.
+
+```{r}
+#One hot encoding of factor variables and Scaling numeric variables
+GENDER.matrix = model.matrix(~GENDER-1, data=df) 
+EDUCATION.matrix = model.matrix(~EDUCATION-1, data=df) 
+MARITAL_STATUS.matrix = model.matrix(~MARITAL_STATUS-1, data=df)
+REPAY_SEP.matrix = model.matrix(~REPAY_SEP-1, data=df) 
+REPAY_AUG.matrix = model.matrix(~REPAY_AUG-1, data=df) 
+REPAY_JUL.matrix = model.matrix(~REPAY_JUL-1, data=df) 
+REPAY_JUN.matrix = model.matrix(~REPAY_JUN-1, data=df) 
+REPAY_MAY.matrix = model.matrix(~REPAY_MAY-1, data=df) 
+REPAY_APR.matrix = model.matrix(~REPAY_APR-1, data=df) 
+dummy.matrix = cbind(GENDER.matrix,EDUCATION.matrix,
+                     MARITAL_STATUS.matrix,
+                     REPAY_SEP.matrix,REPAY_AUG.matrix,
+                     REPAY_JUL.matrix, REPAY_JUN.matrix ,REPAY_MAY.matrix,REPAY_APR.matrix) 
+continuous_data = subset(df2, select =numericCols) 
+continuous_data.scaled = scale(continuous_data) 
+head(continuous_data.scaled,2)
+df2 = data.frame(continuous_data.scaled,dummy.matrix) 
+df2$DEFAULT=df$DEFAULT
+head(df2)
+```
+
+
+Data splitting is the partitioning available dataset into two 
+portions, usually for cross validation purposes. One portion of 
+the data is used to develop a predictive model and the other to 
+evaluate the model's performance. 
+Let us split the observations into 70/30, i.e.,
+out of 100 observations 70 are used to build the model and 
+30 are used to validate the model performance.
+
+Freq_all:
+
+Gives the Count of Non Defaulters 23364 corresponding proportion
+value is 78%
+the Count of Non Defaulters 6636 corresponding proportion
+value is 22%
+
+Freq_train and Freq_test gives the values it takes from the total
+ values of defaulters and non defaulters for train and test data set.
+ 
+ 
+#Library CaTools:
+ 
+#Package caTools:
+Contains several basic utility functions including: moving
+(rolling, running) window statistic functions, read/write for
+GIF and ENVI binary files, fast calculation of AUC, LogitBoost
+classifier, base64 encoder/decoder, round-off-error-free sum
+and cumsum, etc.
+
+Here i Used for Splitting the dataset
+
+#Description:
+Split data from vector Y into two sets in 
+predefined ratio while preserving relative ratios of different
+labels in Y. Used to split the data used during classification 
+into train and test subsets.
+
+#usage:
+sample.split( Y, SplitRatio = 2/3, group = NULL )
+
+#Example:
+split= sample.split(df_final$DEFAULT,SplitRatio=0.7)
+train1=subset(df_final1, split==TRUE) 
+test1=subset(df_final1, split==FALSE)
+
+#Arguments:
+Y-Vector of data labels,here we took df$Default as my variable
+SplitRatio-We are splitting the data set into 70% for train dataset.
+then one random point from Y will be set to TRUE as shown in subset of
+train1.
+
+#Results:
+Splits the total data observation for default as 70% for train data
+and 30% data for the test after the model is built successfully.
+
+```{r}
+install.packages("caTools",repos = "http://cran.us.r-project.org")
+library(caTools)
+df_final1<-df2
+set.seed(1500) 
+split= sample.split(df_final1$DEFAULT,SplitRatio=0.7) 
+train1=subset(df_final1, split==TRUE) 
+test1=subset(df_final1, split==FALSE) 
+freq_all <- cbind (all = table(df_final1$DEFAULT),all_Per = round (prop.table(table(df_final1$DEFAULT)),2)) 
+freq_all
+
+freq_train <- cbind (train = table(train1$DEFAULT),train_Per = round (prop.table(table(train1$DEFAULT)),2)) 
+freq_train 
+freq_test <- cbind (test = table(test1$DEFAULT),test_Per = round 
+(prop.table( table(test1$DEFAULT)),2)) 
+freq_test
+```
+
+
+#Logistic Regression Model:
+One of the most common, successful and transparent ways to 
+do the required binary classification to “good” and “bad” is
+via a logistic function. This is a function that takes as 
+input the client characteristics and outputs the probability of default. 
+p = exp(𝛽 0 + 𝛽1 ∙ 𝑥1 + ⋯ + 𝛽𝑛 ∙ 𝑥𝑛 )/1 + exp(𝛽 0 + 𝛽1 ∙ 𝑥1 + ⋯ + 𝛽𝑛 ∙𝑥𝑛) where in the above 
+- p is the probability of default 
+- xi is the explanatory factor i 
+- βi is the regression coefficient of the explanatory factor i 
+- n is the number of explanatory variables For each of the existing 
+data points it is known whether the client has gone into default or 
+not (i.e. p=1 or p=0). 
+-The aim in the here is to find the coefficients β0,… , βn 
+such that the model’s probability of default equals to 
+the observed probability of default
+
+#Logistic regression output:
+-Builded logistic model with train data that we splitted and we
+used binomial logit function to take log of the equation to find the 
+coefficients.
+-The negative coefficients of Education_Others, Gender_Male and 
+Repayment amount implies that the customer is less likely to default 
+as these values increases.
+
+```{r}
+
+model2<-glm(DEFAULT~.,data = train1,family = binomial("logit"), 
+            maxit=100)
+library(ggplot2)
+summary(model2)
+plot(model2)
+
+
+library(caret)
+varImp(model2)
+```
+
+#Confusion Matrix
+To measure the performance of logistic model we use confusion matrix
+which gives the accuracy of the model with newly predicted values
+with the test data we splitted for and checks with repsonse variable.
+We coudl see that the accuracy of the model is 
+82% on validation dataset, Out of 1991 defaulters in test dataset 
+of 6636, the model was able to predict 1294 as defaulters.
+Hence the sensitivity of the model is just 95.8%.
+
+
+```{r}
+test.predicted.m2 <- predict(model2, newdata = test1, 
+                             type = "response")
+library(e1071)#used to perform confusion matrix of the model
+confusionMatrix(factor(round(test.predicted.m2))
+                ,factor(test1$DEFAULT))
+```
+#ROCCurve
+
+The area under the curve summarizes this: if it is high you pay very 
+little, while if it is low you pay a lot. 
+The ‘ideal’ curve achieves sensitivity 1 for specificity 1, and has AUC 1. 
+This implies you pay nothing in false positives for true positives.
+Our observed curve is pretty good though, as it has a large 
+slope early on, and a high AUC of 0.77.
+
+```{r}
+
+library(pROC)#used to calcualte roc value and plot it,and                          calculate AUC value of the model
+predicted <- predict(model2, newdata = test1, type = "response")
+roc_qda=roc(response=test1$DEFAULT, predictor= predicted, plot=TRUE)
+plot(roc_qda, col="red", lwd=3, main="ROC curve")
+auc_qda<-auc(roc_qda)
+auc_qda#AUC value
+
+```
+
+#Conclusion:
+From the analysis we can conclude that the following factors 
+were playing major role in determining the defaulters. 
+-Repayment status is highly significant
+-High difference between the bill amount and the repayment amount 
+- Customers who had made partial repayment are more likely to default 
+- The chance of customer to default increases if the repayment is 
+delayed by 2 months or more 
+- Demographic variables are not significant to predict defaulters.
+
+#Refernces:
+1.https://www.rdocumentation.org/packages/GGally/versions/1.5.0/topics/ggcorr
+2.https://cran.r-project.org/web/packages/caTools/index.html
+3.https://cran.r-project.org/web/packages/e1071/index.html
+4.https://www.r-project.org/nosvn/pandoc/pROC.html
+5.https://cran.r-project.org/web/packages/tidyverse/index.html
+6.https://cran.r-project.org/web/packages/pastecs/index.html
+7.https://www.rdocumentation.org/packages/scales/versions/0.4.1
+
+
+
